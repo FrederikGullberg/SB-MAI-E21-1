@@ -42,6 +42,20 @@ import org.jhotdraw.geom.*;
 public class SVGImageFigure extends SVGAttributedFigure implements SVGFigure, ImageHolderFigure {
 
     /**
+     * @return the rectangle
+     */
+    public Rectangle2D.Double getRectangle() {
+        return rectangle;
+    }
+
+    /**
+     * @param rectangle the rectangle to set
+     */
+    public void setRectangle(Rectangle2D.Double rectangle) {
+        this.rectangle = rectangle;
+    }
+
+    /**
      * This rectangle describes the bounds into which we draw the image.
      */
     private Rectangle2D.Double rectangle;
@@ -80,7 +94,6 @@ public class SVGImageFigure extends SVGAttributedFigure implements SVGFigure, Im
     @FeatureEntryPoint(JHotDrawFeatures.IMAGE_TOOL)
     public void draw(Graphics2D g) {
         //super.draw(g);
-
         double opacity = OPACITY.get(this);
         opacity = Math.min(Math.max(0d, opacity), 1d);
         if (opacity != 0d) {
@@ -88,10 +101,26 @@ public class SVGImageFigure extends SVGAttributedFigure implements SVGFigure, Im
             if (opacity != 1d) {
                 g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) opacity));
             }
-
             BufferedImage image = getBufferedImage();
             if (image != null) {
-                if (TRANSFORM.get(this) != null) {
+                drawRender(image, g);
+            } else {
+                drawShape(g);
+            }
+            if (opacity != 1d) {
+                g.setComposite(savedComposite);
+            }
+        }
+
+    }
+    public void drawShape(Graphics2D g){
+                Shape shape = getTransformedShape();
+                g.setColor(Color.red);
+                g.setStroke(new BasicStroke());
+                g.draw(shape);
+    }
+    public void drawRender(BufferedImage image, Graphics2D g){
+                       if (TRANSFORM.get(this) != null) {
                     // FIXME - We should cache the transformed image.
                     //         Drawing a transformed image appears to be very slow.
                     Graphics2D gx = (Graphics2D) g.create();
@@ -100,24 +129,17 @@ public class SVGImageFigure extends SVGAttributedFigure implements SVGFigure, Im
                     gx.setRenderingHints(g.getRenderingHints());
                     
                     gx.transform(TRANSFORM.get(this));
-                    gx.drawImage(image, (int) rectangle.x, (int) rectangle.y, (int) rectangle.width, (int) rectangle.height, null);
+                    gx.drawImage(image, (int) getRectangle().x, (int) getRectangle().y, (int) getRectangle().width, (int) getRectangle().height, null);
                     gx.dispose();
-                } else {
-                    g.drawImage(image, (int) rectangle.x, (int) rectangle.y, (int) rectangle.width, (int) rectangle.height, null);
+                } else {                     
+                    g.drawImage(image, (int) getRectangle().x, (int) getRectangle().y, (int) getRectangle().width, (int) getRectangle().height, null);
                 }
-            } else {
-                Shape shape = getTransformedShape();
-                g.setColor(Color.red);
-                g.setStroke(new BasicStroke());
-                g.draw(shape);
-            }
-
-            if (opacity != 1d) {
-                g.setComposite(savedComposite);
-            }
-        }
     }
 
+    
+
+    
+    
     protected void drawFill(Graphics2D g) {
 
     }
@@ -128,23 +150,23 @@ public class SVGImageFigure extends SVGAttributedFigure implements SVGFigure, Im
 
     // SHAPE AND BOUNDS
     public double getX() {
-        return rectangle.x;
+        return getRectangle().x;
     }
 
     public double getY() {
-        return rectangle.y;
+        return getRectangle().y;
     }
 
     public double getWidth() {
-        return rectangle.width;
+        return getRectangle().width;
     }
 
     public double getHeight() {
-        return rectangle.height;
+        return getRectangle().height;
     }
 
     public Rectangle2D.Double getBounds() {
-        return (Rectangle2D.Double) rectangle.clone();
+        return (Rectangle2D.Double) getRectangle().clone();
     }
 
     @Override
@@ -176,7 +198,7 @@ public class SVGImageFigure extends SVGAttributedFigure implements SVGFigure, Im
 
     private Shape getTransformedShape() {
         if (cachedTransformedShape == null) {
-            cachedTransformedShape = (Shape) rectangle.clone();
+            cachedTransformedShape = (Shape) getRectangle().clone();
             if (TRANSFORM.get(this) != null) {
                 cachedTransformedShape = TRANSFORM.get(this).createTransformedShape(cachedTransformedShape);
             }
@@ -220,7 +242,7 @@ public class SVGImageFigure extends SVGAttributedFigure implements SVGFigure, Im
     public void restoreTransformTo(Object geometry) {
         invalidateTransformedShape();
         Object[] o = (Object[]) geometry;
-        rectangle = (Rectangle2D.Double) ((Rectangle2D.Double) o[0]).clone();
+        setRectangle((Rectangle2D.Double) ((Rectangle2D.Double) o[0]).clone());
         if (o[1] == null) {
             TRANSFORM.basicSet(this, null);
         } else {
@@ -230,7 +252,7 @@ public class SVGImageFigure extends SVGAttributedFigure implements SVGFigure, Im
 
     public Object getTransformRestoreData() {
         return new Object[]{
-            rectangle.clone(),
+            getRectangle().clone(),
             TRANSFORM.get(this)
         };
     }
@@ -296,7 +318,7 @@ public class SVGImageFigure extends SVGAttributedFigure implements SVGFigure, Im
     @Override
     public SVGImageFigure clone() {
         SVGImageFigure that = (SVGImageFigure) super.clone();
-        that.rectangle = (Rectangle2D.Double) this.rectangle.clone();
+        that.setRectangle((Rectangle2D.Double) this.getRectangle().clone());
         that.cachedTransformedShape = null;
         that.cachedHitShape = null;
         return that;
@@ -418,6 +440,8 @@ public class SVGImageFigure extends SVGAttributedFigure implements SVGFigure, Im
             baos.write(buf, 0, bytesRead);
         }
         BufferedImage img;
+        
+        
         try {
             img = ImageIO.read(new ByteArrayInputStream(baos.toByteArray()));
         } catch (Throwable t) {
